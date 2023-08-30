@@ -112,14 +112,14 @@ class kmsBase:
 
                 pretty_printer(num_text = 15, where = "srv")
                 kmsRequest = byterize(kmsRequest)
-                loggersrv.debug("KMS Request Bytes: \n%s\n" % justify(deco(binascii.b2a_hex(enco(str(kmsRequest), 'latin-1')), 'latin-1')))                         
+                loggersrv.debug("KMS Request Bytes: \n%s\n" % justify(deco(binascii.b2a_hex(enco(str(kmsRequest), 'latin-1')), 'latin-1')))
                 loggersrv.debug("KMS Request: \n%s\n" % justify(kmsRequest.dump(print_to_stdout = False)))
-                                        
+
                 clientMachineId = kmsRequest['clientMachineId'].get()
                 applicationId = kmsRequest['applicationId'].get()
                 skuId = kmsRequest['skuId'].get()
                 requestDatetime = filetime_to_dt(kmsRequest['requestTime'])
-                                
+
                 # Localize the request time, if module "tzlocal" is available.
                 try:
                         from tzlocal import get_localzone
@@ -138,33 +138,32 @@ class kmsBase:
 
                 # Activation threshold.
                 # https://docs.microsoft.com/en-us/windows/deployment/volume-activation/activate-windows-10-clients-vamt                
-                MinClients = kmsRequest['requiredClientCount'] 
+                MinClients = kmsRequest['requiredClientCount']
                 RequiredClients = MinClients * 2
-                if self.srv_config["clientcount"] != None:
-                        if 0 < self.srv_config["clientcount"] < MinClients:
-                                # fixed to 6 (product server) or 26 (product desktop)
-                                currentClientCount = MinClients + 1
-                                pretty_printer(log_obj = loggersrv.warning,
-                                               put_text = "{reverse}{yellow}{bold}Not enough clients ! Fixed with %s, but activated client \
-could be detected as not genuine !{end}" %currentClientCount)
-                        elif MinClients <= self.srv_config["clientcount"] < RequiredClients:
-                                currentClientCount = self.srv_config["clientcount"]
-                                pretty_printer(log_obj = loggersrv.warning,
-                                               put_text = "{reverse}{yellow}{bold}With count = %s, activated client could be detected as not genuine !{end}" %currentClientCount)
-                        elif self.srv_config["clientcount"] >= RequiredClients:
-                                # fixed to 10 (product server) or 50 (product desktop)
-                                currentClientCount = RequiredClients
-                                if self.srv_config["clientcount"] > RequiredClients:
-                                        pretty_printer(log_obj = loggersrv.warning,
-                                                       put_text = "{reverse}{yellow}{bold}Too many clients ! Fixed with %s{end}" %currentClientCount)
-                else:
+                if self.srv_config["clientcount"] is None:
                         # fixed to 10 (product server) or 50 (product desktop)
                         currentClientCount = RequiredClients     
 
-                        
+
+                elif 0 < self.srv_config["clientcount"] < MinClients:
+                        # fixed to 6 (product server) or 26 (product desktop)
+                        currentClientCount = MinClients + 1
+                        pretty_printer(log_obj = loggersrv.warning,
+                                       put_text = "{reverse}{yellow}{bold}Not enough clients ! Fixed with %s, but activated client \
+could be detected as not genuine !{end}" %currentClientCount)
+                elif MinClients <= self.srv_config["clientcount"] < RequiredClients:
+                        currentClientCount = self.srv_config["clientcount"]
+                        pretty_printer(log_obj = loggersrv.warning,
+                                       put_text = "{reverse}{yellow}{bold}With count = %s, activated client could be detected as not genuine !{end}" %currentClientCount)
+                elif self.srv_config["clientcount"] >= RequiredClients:
+                        # fixed to 10 (product server) or 50 (product desktop)
+                        currentClientCount = RequiredClients
+                        if self.srv_config["clientcount"] > currentClientCount:
+                                pretty_printer(log_obj = loggersrv.warning,
+                                               put_text = "{reverse}{yellow}{bold}Too many clients ! Fixed with %s{end}" %currentClientCount)
                 # Get a name for SkuId, AppId.        
                 kmsdb = kmsDB2Dict()
- 
+
                 appitems = kmsdb[2]
                 for appitem in appitems:
                         kmsitems = appitem['KmsItems']
@@ -179,7 +178,7 @@ could be detected as not genuine !{end}" %currentClientCount)
                                                 skuName = skuId
                                                 pretty_printer(log_obj = loggersrv.warning,
                                                                put_text = "{reverse}{yellow}{bold}Can't find a name for this product !{end}")
-                                    
+
                         try:
                                 if uuid.UUID(appitem['Id']) == applicationId:
                                         appName = appitem['DisplayName']
@@ -198,17 +197,28 @@ could be detected as not genuine !{end}" %currentClientCount)
                         "kmsEpid" : None
                 }
 
-                loggersrv.info("Machine Name: %s" % infoDict["machineName"])
-                loggersrv.info("Client Machine ID: %s" % infoDict["clientMachineId"])
-                loggersrv.info("Application ID: %s" % infoDict["appId"])
-                loggersrv.info("SKU ID: %s" % infoDict["skuId"])
-                loggersrv.info("License Status: %s" % infoDict["licenseStatus"])
-                loggersrv.info("Request Time: %s" % local_dt.strftime('%Y-%m-%d %H:%M:%S %Z (UTC%z)'))
-                
+                loggersrv.info(f'Machine Name: {infoDict["machineName"]}')
+                loggersrv.info(f'Client Machine ID: {infoDict["clientMachineId"]}')
+                loggersrv.info(f'Application ID: {infoDict["appId"]}')
+                loggersrv.info(f'SKU ID: {infoDict["skuId"]}')
+                loggersrv.info(f'License Status: {infoDict["licenseStatus"]}')
+                loggersrv.info(
+                    f"Request Time: {local_dt.strftime('%Y-%m-%d %H:%M:%S %Z (UTC%z)')}"
+                )
+
                 if self.srv_config['loglevel'] == 'MINI':
-                        loggersrv.mini("", extra = {'host': socket.gethostname() + " [" + self.srv_config["ip"] + "]",
-                                                    'status' : infoDict["licenseStatus"],
-                                                    'product' : infoDict["skuId"]})
+                        loggersrv.mini(
+                            "",
+                            extra={
+                                'host':
+                                f"{socket.gethostname()} [" + self.srv_config["ip"] +
+                                "]",
+                                'status':
+                                infoDict["licenseStatus"],
+                                'product':
+                                infoDict["skuId"],
+                            },
+                        )
 
                 if self.srv_config['sqlite'] and self.srv_config['dbSupport']:
                         sql_update(self.dbName, infoDict)
@@ -219,16 +229,16 @@ could be detected as not genuine !{end}" %currentClientCount)
                 response = self.kmsResponseStruct()
                 response['versionMinor'] = kmsRequest['versionMinor']
                 response['versionMajor'] = kmsRequest['versionMajor']
-                
+
                 if not self.srv_config["epid"]:
                         response["kmsEpid"] = epidGenerator(kmsRequest['kmsCountedId'].get(), kmsRequest['versionMajor'],
                                                             self.srv_config["lcid"]).encode('utf-16le')
                 else:
                         response["kmsEpid"] = self.srv_config["epid"].encode('utf-16le')
-                        
+
                 response['clientMachineId'] = kmsRequest['clientMachineId']
                 # rule: timeserver - 4h <= timeclient <= timeserver + 4h, check if is satisfied.
-                response['responseTime'] = kmsRequest['requestTime'] 
+                response['responseTime'] = kmsRequest['requestTime']
                 response['currentClientCount'] = currentClientCount
                 response['vLActivationInterval'] = self.srv_config["activation"]
                 response['vLRenewalInterval'] = self.srv_config["renewal"]
@@ -236,8 +246,8 @@ could be detected as not genuine !{end}" %currentClientCount)
                 if self.srv_config['sqlite'] and self.srv_config['dbSupport']:
                         response = sql_update_epid(self.dbName, kmsRequest, response)
 
-                loggersrv.info("Server ePID: %s" % response["kmsEpid"].decode('utf-16le'))
-                        
+                loggersrv.info(f"""Server ePID: {response["kmsEpid"].decode('utf-16le')}""")
+
                 return response
 
 

@@ -25,15 +25,14 @@ gui_description         = "A GUI for py-kms."
 
 ##---------------------------------------------------------------------------------------------------------------------------------------------------------
 def get_ip_address():
-        if os.name == 'posix':
-                import subprocess
-                ip = subprocess.getoutput("hostname -I")
-        elif os.name == 'nt':
+        if os.name == 'nt':
                 import socket
-                ip = socket.gethostbyname(socket.gethostname())
+                return socket.gethostbyname(socket.gethostname())
+        elif os.name == 'posix':
+                import subprocess
+                return subprocess.getoutput("hostname -I")
         else:
-                ip = 'Unknown'
-        return ip
+                return 'Unknown'
 
 def gui_redirector(stream, redirect_to = TextRedirect.Pretty, redirect_conditio = True, stderr_side = "srv"):
         global txsrv, txclt, txcol
@@ -242,9 +241,9 @@ class KmsGui(tk.Tk):
         def gui_store(self, side, typewidgets):
                 stored = []
                 for pagename in self.pagewidgets[side]["PageWin"].keys():
-                        for widget in self.pagewidgets[side]["PageWin"][pagename].winfo_children():
-                                if widget.winfo_class() in typewidgets:
-                                        stored.append(widget)
+                        stored.extend(widget for widget in self.pagewidgets[side]
+                                      ["PageWin"][pagename].winfo_children()
+                                      if widget.winfo_class() in typewidgets)
                 return stored
 
         def gui_srv(self):
@@ -284,26 +283,33 @@ class KmsGui(tk.Tk):
                                              command = lambda: self.on_clear([txsrv, txclt]))
                 self.exitbtnsrv = tk.Button(self.btnsrvwin, text = 'EXIT', background = self.customcolors['black'],
                                             foreground = self.customcolors['white'], relief = 'flat', font = self.btnwinfont, command = self.on_exit)
-        
+
                 ## Layout widgets (btnsrvwin)
                 self.statesrv.grid(row = 0, column = 0, padx = 2, pady = 2, sticky = 'ew')
                 self.runbtnsrv.grid(row = 1, column = 0, padx = 2, pady = 2, sticky = 'ew')
                 self.shbtnclt.grid(row = 2, column = 0, padx = 2, pady = 2, sticky = 'ew')
                 self.clearbtnsrv.grid(row = 3, column = 0, padx = 2, pady = 2, sticky = 'ew')
                 self.exitbtnsrv.grid(row = 4, column = 0, padx = 2, pady = 2, sticky = 'ew')                
-                
+
                 ## Create widgets (optsrvwin:Srv:PageWin:PageStart) -----------------------------------------------------------------------------------------
                 # Version.
-                ver = tk.Label(self.pagewidgets["Srv"]["PageWin"]["PageStart"],
-                               text = 'You are running server version: ' + srv_version, foreground = self.customcolors['red'],
-                               font = self.othfont)
+                ver = tk.Label(
+                    self.pagewidgets["Srv"]["PageWin"]["PageStart"],
+                    text=f'You are running server version: {srv_version}',
+                    foreground=self.customcolors['red'],
+                    font=self.othfont,
+                )
                 # Ip Address.
                 srvipaddlbl = tk.Label(self.pagewidgets["Srv"]["PageWin"]["PageStart"], text = 'IP Address: ', font = self.optfont)
                 self.srvipadd = tk.Entry(self.pagewidgets["Srv"]["PageWin"]["PageStart"], width = 10, font = self.optfont)
                 self.srvipadd.insert('end', srv_options['ip']['def'])
                 ToolTip(self.srvipadd, text = srv_options['ip']['help'], wraplength = self.wraplength)
-                myipadd = tk.Label(self.pagewidgets["Srv"]["PageWin"]["PageStart"], text = 'Your IP address is: {}'.format(get_ip_address()),
-                                   foreground = self.customcolors['red'], font = self.othfont)
+                myipadd = tk.Label(
+                    self.pagewidgets["Srv"]["PageWin"]["PageStart"],
+                    text=f'Your IP address is: {get_ip_address()}',
+                    foreground=self.customcolors['red'],
+                    font=self.othfont,
+                )
                 # Port.
                 srvportlbl = tk.Label(self.pagewidgets["Srv"]["PageWin"]["PageStart"], text = 'Port: ', font = self.optfont)
                 self.srvport = tk.Entry(self.pagewidgets["Srv"]["PageWin"]["PageStart"], width = 10, font = self.optfont, validate = "key",
@@ -463,7 +469,7 @@ class KmsGui(tk.Tk):
                 ## Create client widgets (optcltwin, msgcltwin, btncltwin)
                 self.update_idletasks()   # update Gui to get btnsrvwin values --> btncltwin.
                 minw, minh = self.winfo_width(), self.winfo_height()
-                self.iconify()  
+                self.iconify()
                 self.gui_clt()
                 maxw, minh = self.winfo_width(), self.winfo_height()
                 ## Main window custom background.
@@ -471,7 +477,7 @@ class KmsGui(tk.Tk):
                 self.iconify()
                 custom_background(self)
                 ## Main window other modifications.
-                self.eval('tk::PlaceWindow %s center' %self.winfo_pathname(self.winfo_id()))
+                self.eval(f'tk::PlaceWindow {self.winfo_pathname(self.winfo_id())} center')
                 self.wm_attributes("-topmost", True)
                 self.protocol("WM_DELETE_WINDOW", lambda: 0)
                 ## Disable maximize button.
@@ -489,7 +495,7 @@ class KmsGui(tk.Tk):
                 self.optcltwin = tk.Canvas(self.masterwin, background = self.customcolors['white'], borderwidth = 3, relief = 'ridge')
                 self.msgcltwin = tk.Frame(self.masterwin, background = self.customcolors['black'], relief = 'ridge', width = 300, height = 200)
                 self.btncltwin = tk.Canvas(self.masterwin, background = self.customcolors['white'], borderwidth = 3, relief = 'ridge')
-                
+
                 xb, yb, wb, hb = self.get_position(self.btnsrvwin)
                 self.btncltwin_X = xb + 2
                 self.btncltwin_Y = yb + hb + 10
@@ -515,11 +521,15 @@ class KmsGui(tk.Tk):
 
                 ## Layout widgets (btncltwin)
                 self.runbtnclt.grid(row = 0, column = 0, padx = 2, pady = 2, sticky = 'ew')
-                
+
                 ## Create widgets (optcltwin:Clt:PageWin:PageStart) ------------------------------------------------------------------------------------------
                 # Version.
-                cltver = tk.Label(self.pagewidgets["Clt"]["PageWin"]["PageStart"], text = 'You are running client version: ' + clt_version,
-                                  foreground = self.customcolors['red'], font = self.othfont)
+                cltver = tk.Label(
+                    self.pagewidgets["Clt"]["PageWin"]["PageStart"],
+                    text=f'You are running client version: {clt_version}',
+                    foreground=self.customcolors['red'],
+                    font=self.othfont,
+                )
                 # Ip Address.
                 cltipaddlbl = tk.Label(self.pagewidgets["Clt"]["PageWin"]["PageStart"], text = 'IP Address: ', font = self.optfont)
                 self.cltipadd = tk.Entry(self.pagewidgets["Clt"]["PageWin"]["PageStart"], width = 10, font = self.optfont)
@@ -584,7 +594,7 @@ class KmsGui(tk.Tk):
                                                                    (self.cltsize, clt_options['lsize']['def']),
                                                                    (self.cltlevel, clt_options['llevel']['def'])],
                                                         width = 10, height = 1, borderwidth = 2, relief = 'ridge')
-               
+
                 ## Layout widgets (optcltwin:Clt:PageWin:PageStart)
                 cltver.grid(row = 0, column = 0, columnspan = 3, padx = 5, pady = 5, sticky = 'ew')
                 cltipaddlbl.grid(row = 1, column = 0, padx = 5, pady = 5, sticky = 'e')
@@ -622,7 +632,7 @@ class KmsGui(tk.Tk):
                 ## Store client-side widgets.
                 self.storewidgets_clt = self.gui_store(side = "Clt", typewidgets = ['Button', 'Entry', 'TCombobox', 'Checkbutton'])
                 self.storewidgets_clt.append(self.chkcltfile)
-                
+
                 ## Create widgets and layout (msgcltwin) -----------------------------------------------------------------------------------------------------
                 self.textboxclt = TextDoubleScroll(self.msgcltwin, background = self.customcolors['black'], wrap = 'none', state = 'disabled',
                                                    relief = 'ridge', font = self.msgfont)
@@ -829,9 +839,9 @@ class KmsGui(tk.Tk):
                                 add_newline = False
                         else:
                                 if self.count_clear == 1:
-                                        self.ini = '%s.0' %(int(self.ini[0]) - 1)
+                                        self.ini = f'{int(self.ini[0]) - 1}.0'
                                 else:
-                                        self.ini = '%s.0' %(int(self.ini[0]))
+                                        self.ini = f'{int(self.ini[0])}.0'
                                 add_newline = True
                         rng = [self.ini, 'end']
                         self.count_clear += 1

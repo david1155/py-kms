@@ -131,7 +131,11 @@ class Etrigan(object):
                         # then always run quit standard.
                         self.quit_standard()
                 else:
-                        self.view(self.logdaemon.error, self.emit_error, "Failed to stop the daemon process: can't find PIDFILE '%s'" %self.pidfile)
+                        self.view(
+                            self.logdaemon.error,
+                            self.emit_error,
+                            f"Failed to stop the daemon process: can't find PIDFILE '{self.pidfile}'",
+                        )
                 sys.exit(0)
 
         def handle_reload(self, signum, frame):
@@ -171,14 +175,10 @@ class Etrigan(object):
                         sys.exit(0)
 
         def view(self, logobj, emitobj, msg, **kwargs):
-                options = {'to_exit' : False,
-                           'silent' : False
-                           }
-                options.update(kwargs)
-
+                options = {'to_exit': False, 'silent': False} | kwargs
                 if logobj:
                         logobj(msg)
-                if emitobj:                        
+                if emitobj:
                         if not options['silent']:
                                 emitobj(msg, to_exit = options['to_exit'])
 
@@ -225,7 +225,7 @@ class Etrigan(object):
                                 # Exit from parent.
                                 sys.exit(0)
                 except Exception as e:
-                        msg += " failed: %s." %str(e)
+                        msg += f" failed: {str(e)}."
                         self.view(self.logdaemon.error, self.emit_error, msg)
                         
         def detach(self):
@@ -233,19 +233,19 @@ class Etrigan(object):
                 try:
                         os.chdir(self.homedir)
                 except Exception as e:
-                        msg = "Unable to change working directory: %s." %str(e)
+                        msg = f"Unable to change working directory: {str(e)}."
                         self.view(self.logdaemon.error, self.emit_error, msg)
-                        
+
                 # clear the session id to clear the controlling tty.
                 pid = os.setsid()
                 if pid == -1:
                         sys.exit(1)
-                
+
                 # set the umask so we have access to all files created by the daemon.
                 try:
                         os.umask(self.umask)
                 except Exception as e:
-                        msg = "Unable to change file creation mask: %s." %str(e)
+                        msg = f"Unable to change file creation mask: {str(e)}."
                         self.view(self.logdaemon.error, self.emit_error, msg)
 
         def attach(self, name, mode, buffering = -1):
@@ -256,10 +256,10 @@ class Etrigan(object):
                 filename = os.path.basename(path)
                 pathname = os.path.dirname(path)
                 if not os.path.isdir(pathname):
-                        msg = "argument %s: invalid directory: '%s'. Exiting..." %(typearg, pathname)
+                        msg = f"argument {typearg}: invalid directory: '{pathname}'. Exiting..."
                         self.view(self.logdaemon.error, self.emit_error, msg)
                 elif not filename.lower().endswith(typefile):
-                        msg = "argument %s: not a %s file, invalid extension: '%s'. Exiting..." %(typearg, typefile, filename)
+                        msg = f"argument {typearg}: not a {typefile} file, invalid extension: '{filename}'. Exiting..."
                         self.view(self.logdaemon.error, self.emit_error, msg)
 
         def create_pidfile(self):
@@ -270,7 +270,7 @@ class Etrigan(object):
                              pf.write("%s\n" %pid)
                         self.view(self.logdaemon.debug, None, "PID %d written to '%s'." %(pid, self.pidfile))
                 except Exception as e:
-                        msg = "Unable to write PID to PIDFILE '%s': %s" %(self.pidfile, str(e))
+                        msg = f"Unable to write PID to PIDFILE '{self.pidfile}': {str(e)}"
                         self.view(self.logdaemon.error, self.emit_error, msg)
 
         def delete_pidfile(self, pid):
@@ -315,19 +315,18 @@ class Etrigan(object):
 
                 if pid is not None and pid_exists(pid):
                         return pid
-                else:
-                        # Remove the stale PID file.
-                        self.delete_pidfile(pid)
-                        return None
+                # Remove the stale PID file.
+                self.delete_pidfile(pid)
+                return None
 
         def start(self):
                 """ Start the daemon. """
                 self.view(self.logdaemon.info, self.emit_message, "Starting the daemon process...", silent = self.etrigan_restart)
-                
+
                 # Check for a PID file to see if the Daemon is already running.
                 pid = self.get_pidfile()
                 if pid is not None:
-                        msg = "A previous daemon process with PIDFILE '%s' already exists. Daemon already running ?" %self.pidfile
+                        msg = f"A previous daemon process with PIDFILE '{self.pidfile}' already exists. Daemon already running ?"
                         self.view(self.logdaemon.warning, self.emit_error, msg, to_exit = False)
                         return
 
@@ -344,7 +343,7 @@ class Etrigan(object):
         def stop(self):
                 """ Stop the daemon. """
                 self.view(None, self.emit_message, "Stopping the daemon process...", silent = self.etrigan_restart)
-                
+
                 self.logdaemon.disabled = True
                 pid = self.get_pidfile()
                 self.logdaemon.disabled = False
@@ -354,7 +353,7 @@ class Etrigan(object):
                         if os.path.exists(self.pidfile):
                                 self.delete_pidfile(pid)
 
-                        msg = "Can't find the daemon process with PIDFILE '%s'. Daemon not running ?" %self.pidfile
+                        msg = f"Can't find the daemon process with PIDFILE '{self.pidfile}'. Daemon not running ?"
                         self.view(self.logdaemon.warning, self.emit_error, msg, to_exit = False)
                         return
 
@@ -365,7 +364,11 @@ class Etrigan(object):
                                 time.sleep(0.1)
                 except Exception as e:
                         if (e.errno != errno.ESRCH):
-                                self.view(self.logdaemon.error, self.emit_error, "Failed to stop the daemon process: %s" %str(e))
+                                self.view(
+                                    self.logdaemon.error,
+                                    self.emit_error,
+                                    f"Failed to stop the daemon process: {str(e)}",
+                                )
                         else:
                                 self.view(None, self.emit_message, "The daemon process has ended correctly.", silent = self.etrigan_restart)
 
@@ -388,7 +391,7 @@ class Etrigan(object):
 
                 if self.pidfile is None:
                         self.view(self.logdaemon.error, self.emit_error, "Cannot get the status of daemon without PIDFILE.")
-           
+
                 pid = self.get_pidfile()
                 if pid is None:
                         self.view(self.logdaemon.info, self.emit_message, "The daemon process is not running.", to_exit = True)
@@ -398,7 +401,7 @@ class Etrigan(object):
                                         pass
                                 self.view(self.logdaemon.info, self.emit_message, "The daemon process is running.", to_exit = True)
                         except Exception as e:
-                                msg = "There is not a process with the PIDFILE '%s': %s" %(self.pidfile, str(e))
+                                msg = f"There is not a process with the PIDFILE '{self.pidfile}': {str(e)}"
                                 self.view(self.logdaemon.error, self.emit_error, msg)
 
         def flatten(self, alistoflists, ltypes = Sequence):
@@ -406,7 +409,7 @@ class Etrigan(object):
                 alistoflists = list(alistoflists)
                 while alistoflists:
                         while alistoflists and isinstance(alistoflists[0], ltypes):
-                                alistoflists[0:1] = alistoflists[0]
+                                alistoflists[:1] = alistoflists[0]
                         if alistoflists: yield alistoflists.pop(0)
 
         def exclude(self, func):
@@ -427,62 +430,63 @@ class Etrigan(object):
                 if isinstance(some_functions, (list, tuple)):
                         for func in some_functions: 
                                 l_req = len(self.exclude(func)[0])
-                                
+
                                 if l_req == 0:
                                         returned = func()
                                 else:
                                         l_add = len(self.etrigan_add)
                                         if l_req > l_add:
-                                                self.view(self.logdaemon.error, self.emit_error,
-                                                          "Can't evaluate function: given %s, required %s." %(l_add, l_req))
+                                                self.view(
+                                                    self.logdaemon.error,
+                                                    self.emit_error,
+                                                    f"Can't evaluate function: given {l_add}, required {l_req}.",
+                                                )
                                                 return
                                         else:
                                                 arguments = self.etrigan_add[self.etrigan_index]
                                                 l_args = (len(arguments) if isinstance(arguments, list) else 1)
                                                 if (l_args > l_req) or (l_args < l_req):
-                                                        self.view(self.logdaemon.error, self.emit_error,
-                                                                  "Can't evaluate function: given %s, required %s." %(l_args, l_req))
+                                                        self.view(
+                                                            self.logdaemon.error,
+                                                            self.emit_error,
+                                                            f"Can't evaluate function: given {l_args}, required {l_req}.",
+                                                        )
                                                         return
                                                 else:
-                                                        if isinstance(arguments, list):
-                                                                returned = func(*arguments)
-                                                        else:
-                                                                returned = func(arguments)
-
+                                                        returned = func(*arguments) if isinstance(arguments, list) else func(arguments)
                                 if returned:
                                         if isinstance(returned, (list, tuple)):
-                                                if isinstance(returned[0], int):
-                                                        self.etrigan_index = returned[0]
-                                                else:
-                                                        self.etrigan_index = slice(*map(int, returned[0].split(':')))
+                                                self.etrigan_index = (
+                                                    returned[0] if isinstance(
+                                                        returned[0], int)
+                                                    else slice(*map(
+                                                        int, returned[0].split(':'))))
                                                 if returned[1:] != []:
                                                         self.etrigan_add.append(returned[1:])
                                                         self.etrigan_add = list(self.flatten(self.etrigan_add))
                                         else:
                                                 self.view(self.logdaemon.error, self.emit_error, "Function should return list or tuple.")
                                         returned = None
-                else:
-                        if some_functions is None:
-                                self.run()
+                elif some_functions is None:
+                        self.run()
 
         def loop(self):
                 try:
                         if self.pause_loop is None:
                                 # one-shot.
                                 self.execute(self.funcs_to_daemonize)
-                        else:
-                                if self.pause_loop >= 0:
-                                        # infinite with pause.
+                        elif self.pause_loop >= 0:
+                                # infinite with pause.
+                                time.sleep(self.pause_loop)
+                                while self.etrigan_alive:
+                                        self.execute(self.funcs_to_daemonize)
                                         time.sleep(self.pause_loop)
-                                        while self.etrigan_alive:
-                                                self.execute(self.funcs_to_daemonize)
-                                                time.sleep(self.pause_loop)
-                                elif self.pause_loop == -1:
-                                        # infinite without pause.
-                                        while self.etrigan_alive:
-                                                self.execute(self.funcs_to_daemonize)
+                        elif self.pause_loop == -1:
+                                # infinite without pause.
+                                while self.etrigan_alive:
+                                        self.execute(self.funcs_to_daemonize)
                 except Exception as e:
-                        msg = "The daemon process start method failed: %s" %str(e)
+                        msg = f"The daemon process start method failed: {str(e)}"
                         self.view(self.logdaemon.error, self.emit_error, msg)
                         
         def quit_standard(self):
@@ -555,10 +559,10 @@ class Etrigan_check(object):
                 filename, extension = os.path.splitext(path)
                 pathname = os.path.dirname(path)
                 if not os.path.isdir(pathname):
-                        msg = "argument `%s`: invalid directory: '%s'. Exiting..." %(typearg, pathname)
+                        msg = f"argument `{typearg}`: invalid directory: '{pathname}'. Exiting..."
                         self.emit_opt_err(msg)
-                elif not extension == typefile:
-                        msg = "argument `%s`: not a %s file, invalid extension: '%s'. Exiting..." %(typearg, typefile, extension)
+                elif extension != typefile:
+                        msg = f"argument `{typearg}`: not a {typefile} file, invalid extension: '{extension}'. Exiting..."
                         self.emit_opt_err(msg)
 
         def checkfunction(self, funcs, booleans):
@@ -566,9 +570,9 @@ class Etrigan_check(object):
                         if funcs is not None:
                                 msg = "argument `funcs_to_daemonize`: provide list, tuple or None"
                                 self.emit_opt_err(msg)
-                                        
+
                 for elem in booleans:
-                        if not type(elem) == bool:
+                        if type(elem) != bool:
                                 msg = "argument `want_quit`: not a boolean."
                                 self.emit_opt_err(msg)
         

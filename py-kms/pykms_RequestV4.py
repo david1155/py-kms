@@ -69,7 +69,7 @@ class kmsRequestV4(kmsBase):
                 aes = AES()
 
                 messageSize = len(message)
-                lastBlock = bytearray(16) 
+                lastBlock = bytearray(16)
                 hashBuffer = bytearray(16)
 
                 # MessageSize / Blocksize.
@@ -83,11 +83,8 @@ class kmsRequestV4(kmsBase):
                         xorBuffer(message, i << 4, hashBuffer, 16)
                         hashBuffer = bytearray(aes.encrypt(hashBuffer, key, len(key)))
 
-                # Bit Padding.
-                ii = 0
-                for i in range(j << 4, k + (j << 4)):
+                for ii, i in enumerate(range(j << 4, k + (j << 4))):
                         lastBlock[ii] = message[i]
-                        ii += 1
                 lastBlock[k] = 0x80
 
                 xorBuffer(lastBlock, 0, hashBuffer, 16)

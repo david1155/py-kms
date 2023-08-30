@@ -87,9 +87,9 @@ class handler(pykms_RpcBase.rpcBase):
 
         def generateResponse(self, request):
                 response = MSRPCBindAck()
-                
+
                 bind = MSRPCBind(request['pduData'])
-                               
+
                 response['ver_major'] = request['ver_major']
                 response['ver_minor'] = request['ver_minor']
                 response['type'] = self.packetType['bindAck']
@@ -110,8 +110,7 @@ class handler(pykms_RpcBase.rpcBase):
                 response['Pad'] = '\0' * pad
                 response['ctx_num'] = bind['ctx_num']
 
-                preparedResponses = {}
-                preparedResponses[uuidNDR32] = CtxItemResult(0, 0, uuidNDR32, 2)
+                preparedResponses = {uuidNDR32: CtxItemResult(0, 0, uuidNDR32, 2)}
                 preparedResponses[uuidNDR64] = CtxItemResult(2, 2, uuidEmpty, 0)
                 preparedResponses[uuidTime] = CtxItemResult(3, 3, uuidEmpty, 0)
 
@@ -125,7 +124,7 @@ class handler(pykms_RpcBase.rpcBase):
                 response = byterize(response)
                 loggersrv.debug("RPC Bind Response: \n%s\n" % justify(response.dump(print_to_stdout = False)))
                 loggersrv.debug("RPC Bind Response Bytes: \n%s\n" % justify(deco(binascii.b2a_hex(enco(str(response), 'latin-1')), 'utf-8')))
-                
+
                 return response
 
         def generateRequest(self):

@@ -26,14 +26,9 @@ if sys.version_info[0] == 2:
 else:
     import codecs
     def b(x):
-        if isinstance(x, bytes) is False:
-            return codecs.latin_1_encode(x)[0]
-        return x
+        return codecs.latin_1_encode(x)[0] if not isinstance(x, bytes) else x
     def buildStr(x):
-        if isinstance(x, bytes):
-            return "".join(map(chr,x))
-        else:
-            return x
+        return "".join(map(chr,x)) if isinstance(x, bytes) else x
 
 class Structure:
     """ sublcasses can define commonHdr and/or structure.
@@ -113,7 +108,7 @@ class Structure:
 
     def packField(self, fieldName, format = None):
         if self.debug:
-            print("packField( %s | %s )" % (fieldName, format))
+            print(f"packField( {fieldName} | {format} )")
 
         if format is None:
             format = self.formatForField(fieldName)
@@ -139,16 +134,16 @@ class Structure:
                 if field[0] in self.fields:
                     e.args += ("When packing field '%s | %s | %r' in %s" % (field[0], field[1], self[field[0]], self.__class__),)
                 else:
-                    e.args += ("When packing field '%s | %s' in %s" % (field[0], field[1], self.__class__),)
+                    e.args += (
+                        f"When packing field '{field[0]} | {field[1]}' in {self.__class__}",
+                    )
                 raise
             if self.alignment:
                 if len(data) % self.alignment:
                     data += b('\x00'*self.alignment)[:-(len(data) % self.alignment)]
-            
+
         #if len(data) % self.alignment: data += ('\x00'*self.alignment)[:-(len(data) % self.alignment)]
-        if isinstance(data,str):
-            return data
-        return buildStr(data)
+        return data if isinstance(data,str) else buildStr(data)
 
     def fromString(self, data):
         self.rawData = data
@@ -207,7 +202,7 @@ class Structure:
             return b''
 
         # quote specifier
-        if format[:1] == "'" or format[:1] == '"':
+        if format[:1] in ["'", '"']:
             return b(format[1:])
 
         # code specifier
@@ -217,7 +212,7 @@ class Structure:
                 return self.pack(two[0], data)
             except:
                 fields = {'self':self}
-                fields.update(self.fields)
+                fields |= self.fields
                 return self.pack(two[0], eval(two[1], {}, fields))
 
         # address specifier
@@ -246,11 +241,10 @@ class Structure:
             for each in data:
                 answer += self.pack(two[1], each)
             if two[0]:
-                if two[0].isdigit():
-                    if int(two[0]) != len(data):
-                        raise Exception("Array field has a constant size, and it doesn't match the actual value")
-                else:
+                if not two[0].isdigit():
                     return self.pack(two[0], len(data))+answer
+                if int(two[0]) != len(data):
+                    raise Exception("Array field has a constant size, and it doesn't match the actual value")
             return answer
 
         # "printf" string specifier
@@ -272,25 +266,19 @@ class Structure:
                 data = '\0\0'
             elif len(data) % 2:
                 data += '\0'
-            l = pack('<L', int(len(data)/2))
+            l = pack('<L', len(data) // 2)
             l = buildStr(l)
             return b('%s\0\0\0\0%s%s' % (l,l,data))
-                    
+
         if data is None:
             raise Exception("Trying to pack None")
-        
+
         # literal specifier
         if format[:1] == ':':
             # Inner Structures?
-            if isinstance(data,Structure):
-                return b(data.getData())
-            return b(data)
-
+            return b(data.getData()) if isinstance(data,Structure) else b(data)
         # struct like specifier
-        if isinstance(data, str):
-            return pack(format, b(data))
-        else:
-            return pack(format, data)
+        return pack(format, b(data)) if isinstance(data, str) else pack(format, data)
 
     def unpack(self, format, data, dataClassOrCode = str, field = None):
         if self.debug:
@@ -302,17 +290,15 @@ class Structure:
                 if not self[addressField]:
                     return
 
-        # void specifier
         if format[:1] == '_':
-            if dataClassOrCode != str:
-                fields = {'self':self, 'inputDataLeft':data}
-                fields.update(self.fields)
-                return eval(dataClassOrCode, {}, fields)
-            else:
+            if dataClassOrCode == str:
                 return None
 
+            fields = {'self':self, 'inputDataLeft':data}
+            fields |= self.fields
+            return eval(dataClassOrCode, {}, fields)
         # quote specifier
-        if format[:1] == "'" or format[:1] == '"':
+        if format[:1] in ["'", '"']:
             answer = format[1:]
             if answer != data:
                 raise Exception("Unpacked data doesn't match constant value '%r' should be '%r'" % (data, answer))
@@ -397,7 +383,7 @@ class Structure:
             return 0
 
         # quote specifier
-        if format[:1] == "'" or format[:1] == '"':
+        if format[:1] in ["'", '"']:
             return len(format)-1
 
         # address specifier
@@ -449,11 +435,7 @@ class Structure:
             return int((12+l+(l % 2)))
 
         # literal specifier
-        if format[:1] == ':':
-            return len(data)
-
-        # struct like specifier
-        return calcsize(format)
+        return len(data) if format[:1] == ':' else calcsize(format)
 
     def calcUnpackSize(self, format, data, field = None):
         if self.debug:
@@ -475,9 +457,9 @@ class Structure:
             pass
 
         # XXX: Try to match to actual values, raise if no match
-        
+
         # quote specifier
-        if format[:1] == "'" or format[:1] == '"':
+        if format[:1] in ["'", '"']:
             return len(format)-1
 
         # address specifier
@@ -533,11 +515,7 @@ class Structure:
             return 12+l*2
 
         # literal specifier
-        if format[:1] == ':':
-            return len(data)
-
-        # struct like specifier
-        return calcsize(format)
+        return len(data) if format[:1] == ':' else calcsize(format)
 
     def calcPackFieldSize(self, fieldName, format = None):
         if format is None:
@@ -549,23 +527,31 @@ class Structure:
         for field in self.commonHdr+self.structure:
             if field[0] == fieldName:
                 return field[1]
-        raise Exception("Field %s not found" % fieldName)
+        raise Exception(f"Field {fieldName} not found")
 
     def findAddressFieldFor(self, fieldName):
-        descriptor = '&%s' % fieldName
+        descriptor = f'&{fieldName}'
         l = len(descriptor)
-        for field in self.commonHdr+self.structure:
-            if field[1][-l:] == descriptor:
-                return field[0]
-        return None
+        return next(
+            (
+                field[0]
+                for field in self.commonHdr + self.structure
+                if field[1][-l:] == descriptor
+            ),
+            None,
+        )
         
     def findLengthFieldFor(self, fieldName):
-        descriptor = '-%s' % fieldName
+        descriptor = f'-{fieldName}'
         l = len(descriptor)
-        for field in self.commonHdr+self.structure:
-            if field[1][-l:] == descriptor:
-                return field[0]
-        return None
+        return next(
+            (
+                field[0]
+                for field in self.commonHdr + self.structure
+                if field[1][-l:] == descriptor
+            ),
+            None,
+        )
         
     def dump(self, msg = None, indent = 0, print_to_stdout = True):     
         if msg is None:
@@ -612,7 +598,7 @@ class _StructureTest:
         print()
         print("-"*70)
         testName = self.__class__.__name__
-        print("starting test: %s....." % testName)
+        print(f"starting test: {testName}.....")
         a = self.create()
         self.populate(a)
         a.dump("packing.....")
