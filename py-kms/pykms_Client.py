@@ -71,7 +71,11 @@ Use \"STDOUTOFF\" to disable stdout messages. Use \"FILEOFF\" if you not want to
         }
 
 def client_options():
-        client_parser = KmsParser(description = clt_description, epilog = 'version: ' + clt_version, add_help = False)
+        client_parser = KmsParser(
+            description=clt_description,
+            epilog=f'version: {clt_version}',
+            add_help=False,
+        )
         client_parser.add_argument("ip", nargs = "?", action = "store", default = clt_options['ip']['def'],
                                    help = clt_options['ip']['help'], type = str)
         client_parser.add_argument("port", nargs = "?", action = "store", default = clt_options['port']['def'],
@@ -147,14 +151,18 @@ def client_update():
         appitems = kmsdb[2]
         for appitem in appitems:
                 kmsitems = appitem['KmsItems']
-                for kmsitem in kmsitems:                                
+                for kmsitem in kmsitems:                
                         name = re.sub('\(.*\)', '', kmsitem['DisplayName']).replace('2015', '').replace(' ', '')
                         if name == clt_config['mode']:
                                 skuitems = kmsitem['SkuItems']
                                 # Select 'Enterprise' for Windows or 'Professional Plus' for Office.
                                 for skuitem in skuitems:
-                                        if skuitem['DisplayName'].replace(' ','') == name + 'Enterprise' or \
-                                           skuitem['DisplayName'].replace(' ','') == name[:6] + 'ProfessionalPlus' + name[6:]:
+                                        if skuitem['DisplayName'].replace(
+                                            ' ', ''
+                                        ) in [
+                                            f'{name}Enterprise',
+                                            f'{name[:6]}ProfessionalPlus{name[6:]}',
+                                        ]:
 
                                                 clt_config['KMSClientSkuID'] = skuitem['Id']
                                                 clt_config['RequiredClientCount'] = int(kmsitem['NCountPolicy'])
@@ -221,24 +229,41 @@ def client_create():
                 parsed = MSRPCRespHeader(response)
                 kmsData = readKmsResponse(parsed['pduData'], kmsRequest, clt_config)
                 kmsResp = kmsData['response']
-                
+
                 try:
                         hwid = kmsData['hwid']
-                        loggerclt.info("KMS Host HWID: %s" % deco(binascii.b2a_hex(enco(hwid, 'latin-1')).upper(), 'utf-8'))
+                        loggerclt.info(
+                            f"KMS Host HWID: {deco(binascii.b2a_hex(enco(hwid, 'latin-1')).upper(), 'utf-8')}"
+                        )
                 except KeyError:
                         pass
-                loggerclt.info("KMS Host ePID: %s" % kmsResp['kmsEpid'].encode('utf-8').decode('utf-16le'))
-                loggerclt.info("KMS Host Current Client Count: %s" % kmsResp['currentClientCount'])
-                loggerclt.info("KMS VL Activation Interval: %s" % kmsResp['vLActivationInterval'])
-                loggerclt.info("KMS VL Renewal Interval: %s" % kmsResp['vLRenewalInterval'])
-                
+                loggerclt.info(
+                    f"KMS Host ePID: {kmsResp['kmsEpid'].encode('utf-8').decode('utf-16le')}"
+                )
+                loggerclt.info(
+                    f"KMS Host Current Client Count: {kmsResp['currentClientCount']}"
+                )
+                loggerclt.info(
+                    f"KMS VL Activation Interval: {kmsResp['vLActivationInterval']}"
+                )
+                loggerclt.info(f"KMS VL Renewal Interval: {kmsResp['vLRenewalInterval']}")
+
                 if clt_config['loglevel'] == 'MINI':
-                        loggerclt.mini("", extra = {'host': socket.gethostname() + " [" + clt_config["ip"] + "]",
-                                                    'status' : "Activated",
-                                                    'product' : clt_config["mode"]})
+                        loggerclt.mini(
+                            "",
+                            extra={
+                                'host':
+                                f"{socket.gethostname()} [" +
+                                clt_config["ip"] + "]",
+                                'status':
+                                "Activated",
+                                'product':
+                                clt_config["mode"],
+                            },
+                        )
 
                 pretty_printer(num_text = 21, where = "clt")
-                
+
         elif packetType == rpcBase.packetType['bindNak']:
                 loggerclt.info(justify(MSRPCBindNak(bindResponse).dump(print_to_stdout = False)))
                 sys.exit(0)
@@ -272,15 +297,18 @@ def createKmsRequestBase():
         requestDict['previousClientMachineId'] = '\0' * 16 # I'm pretty sure this is supposed to be a null UUID.
         requestDict['requiredClientCount'] = clt_config['RequiredClientCount']
         requestDict['requestTime'] = dt_to_filetime(datetime.datetime.utcnow())
-        requestDict['machineName'] = (clt_config['machine'] if (clt_config['machine'] is not None) else
-                                      ''.join(random.choice(string.ascii_letters + string.digits) for i in range(random.randint(2,63)))).encode('utf-16le')
+        requestDict['machineName'] = (
+            clt_config['machine']
+            if clt_config['machine'] is not None else ''.join(
+                random.choice(string.ascii_letters + string.digits)
+                for _ in range(random.randint(2, 63)))).encode('utf-16le')
         requestDict['mnPad'] = '\0'.encode('utf-16le') * (63 - len(requestDict['machineName'].decode('utf-16le')))
-        
+
         # Debug Stuff
         pretty_printer(num_text = 9, where = "clt")
         requestDict = byterize(requestDict)
         loggerclt.debug("Request Base Dictionary: \n%s\n" % justify(requestDict.dump(print_to_stdout = False)))
-        
+
         return requestDict
 
 def createKmsRequest():
@@ -324,14 +352,12 @@ def readKmsResponseV4(data, request):
 
 def readKmsResponseV5(data):
         response = kmsRequestV5.ResponseV5(data)
-        decrypted = kmsRequestV5(data, clt_config).decryptResponse(response)
-        return decrypted
+        return kmsRequestV5(data, clt_config).decryptResponse(response)
 
 def readKmsResponseV6(data):
         response = kmsRequestV6.ResponseV5(data)
         decrypted = kmsRequestV6(data, clt_config).decryptResponse(response)
-        message = decrypted['message']
-        return message
+        return decrypted['message']
 
 if __name__ == "__main__":
         clt_main(with_gui = False)

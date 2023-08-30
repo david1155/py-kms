@@ -41,17 +41,17 @@ def justify(astring, indent = 35, break_every = 100):
     longests = [(n, s) for n, s in enumerate(splitted) if len(s) >= break_every]
 
     for longest in longests:
-        lines = []
-        for i in range(0, len(longest[1]), break_every):
-            lines.append(longest[1][i : i + break_every])
+        lines = [
+            longest[1][i : i + break_every]
+            for i in range(0, len(longest[1]), break_every)
+        ]
         splitted[longest[0]] = str_indent.join(lines)
-        
-    if len(splitted) > 1:
-        justy = str_indent.join(splitted)
-    else:
-        justy = str_indent + str_indent.join(splitted)
-   
-    return justy
+
+    return (
+        str_indent.join(splitted)
+        if len(splitted) > 1
+        else str_indent + str_indent.join(splitted)
+    )
 
 ##----------------------------------------------------------------------------------------------------------------------------------------------------
 ColorMap = {'gray'       : '\x1b[90m',
@@ -149,8 +149,10 @@ def unshell_message(ansi_string, count):
 
     for k in range(len(ansi_indx) - 1):
         ansi_value = ansi_string[ansi_indx[k] : ansi_indx[k + 1]]
-        if ansi_value not in ['\x1b[0m', '\n']:
-            tagname = "tag" + str(count).zfill(2)
+        if ansi_value == '\x1b[0m':
+            count += 1
+        elif ansi_value != '\n':
+            tagname = f"tag{str(count).zfill(2)}"
             if tagname not in msgcolored:
                 msgcolored[tagname] = {'color' : '', 'extra' : [], 'text' : ''}
 
@@ -160,9 +162,6 @@ def unshell_message(ansi_string, count):
                 msgcolored[tagname]['extra'].append(ExtraMapReversed[ansi_value])
             else:
                     msgcolored[tagname]['text'] = ansi_value
-        else:
-                if ansi_value != '\n':
-                        count += 1
     # Ordering.
     msgcolored = OrderedDict(sorted(msgcolored.items()))
 
@@ -191,8 +190,10 @@ class ShellMessage(object):
             self.put_text = put_text
             self.where = where
             self.plaintext = []
-            self.path_nl = os.path.dirname(os.path.abspath( __file__ )) + '/pykms_newlines.txt'
-            self.path_clean_nl = os.path.dirname(os.path.abspath( __file__ )) + '/pykms_clean_newlines.txt'
+            self.path_nl = (
+                f'{os.path.dirname(os.path.abspath(__file__))}/pykms_newlines.txt'
+            )
+            self.path_clean_nl = f'{os.path.dirname(os.path.abspath(__file__))}/pykms_clean_newlines.txt'
             self.queue_get = Queue.Queue()
 
         def formatter(self, msgtofrmt):
@@ -314,26 +315,18 @@ class ShellMessage(object):
                 self.putter(self.queue_get, self.plaintext)
 
         def manage(self):
-            if not ShellMessage.viewsrv:
-                # viewsrv = False, viewclt = True.
-                if ShellMessage.viewclt:
-                    if self.where == 'srv':
-                        self.notview()
-                        return
-                else:
-                    # viewsrv = False, viewclt = False.
-                    self.notview()
-                    return
-            else:
-                # viewsrv = True, viewclt = False.
+            if ShellMessage.viewsrv:
                 if not ShellMessage.viewclt:
                     if self.where == 'clt':
                         self.notview()
                         return
-                else:
-                    # viewsrv = True, viewclt = True.
-                    pass
-
+            elif (
+                ShellMessage.viewclt
+                and self.where == 'srv'
+                or not ShellMessage.viewclt
+            ):
+                self.notview()
+                return
             # Do job.
             self.produce()
             toprint = self.consume(queue_print, timeout = 0.1)
@@ -389,7 +382,7 @@ class ShellMessage(object):
                 return None
 
 def pretty_printer(**kwargs):
-        """kwargs:
+    """kwargs:
                     `log_obj`  --> if logging object specified the text not ansi
                                    formatted is logged.
                     `get_text` --> if True obtain text not ansi formatted,
@@ -402,42 +395,41 @@ def pretty_printer(**kwargs):
                     `where`    --> specifies if message is server-side or client-side
                                    (useful for GUI redirect).
         """
-        # Set defaults for not defined options.
-        options = {'log_obj'  : None,
-                   'get_text' : False,
-                   'put_text' : None,
-                   'num_text' : None,
-                   'to_exit'  : False,
-                   'where'    : 'srv'
-                   }
-        options.update(kwargs)
-        # Check options.
-        if (options['num_text'] is None) and (options['put_text'] is None):
-                raise ValueError('One of `num_text` and `put_text` must be provided.')
-        elif (options['num_text'] is not None) and (options['put_text'] is not None):
-                raise ValueError('These parameters are mutually exclusive.')
+    options = {
+        'log_obj': None,
+        'get_text': False,
+        'put_text': None,
+        'num_text': None,
+        'to_exit': False,
+        'where': 'srv',
+    } | kwargs
+    # Check options.
+    if (options['num_text'] is None) and (options['put_text'] is None):
+            raise ValueError('One of `num_text` and `put_text` must be provided.')
+    elif (options['num_text'] is not None) and (options['put_text'] is not None):
+            raise ValueError('These parameters are mutually exclusive.')
 
-        if (options['num_text'] is not None) and (not isinstance(options['num_text'], list)):
-                options['num_text'] = [options['num_text']]
-        if (options['put_text'] is not None) and (not isinstance(options['put_text'], list)):
-                options['put_text'] = [options['put_text']]
+    if (options['num_text'] is not None) and (not isinstance(options['num_text'], list)):
+            options['num_text'] = [options['num_text']]
+    if (options['put_text'] is not None) and (not isinstance(options['put_text'], list)):
+            options['put_text'] = [options['put_text']]
 
-        # Overwrite `get_text` (used as hidden).
-        if options['put_text']:
-                options['get_text'] = True
-        elif options['num_text']:
-                options['get_text'] = False
+    # Overwrite `get_text` (used as hidden).
+    if options['put_text']:
+            options['get_text'] = True
+    elif options['num_text']:
+            options['get_text'] = False
 
-        # Process messages.
-        shmsg = ShellMessage.Process(options['num_text'],
-                                     get_text = options['get_text'],
-                                     put_text = options['put_text'],
-                                     where = options['where'])
+    # Process messages.
+    shmsg = ShellMessage.Process(options['num_text'],
+                                 get_text = options['get_text'],
+                                 put_text = options['put_text'],
+                                 where = options['where'])
 
-        shmsg.execute()
-        plain_messages = shmsg.consume(shmsg.queue_get, timeout = None)
-        if options['log_obj']:
-                for plain_message in plain_messages:
-                        options['log_obj'](plain_message)
-        if options['to_exit']:
-                sys.exit(1)
+    shmsg.execute()
+    plain_messages = shmsg.consume(shmsg.queue_get, timeout = None)
+    if options['log_obj']:
+            for plain_message in plain_messages:
+                    options['log_obj'](plain_message)
+    if options['to_exit']:
+            sys.exit(1)

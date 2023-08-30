@@ -67,20 +67,19 @@ class LevelFormatter(logging.Formatter):
 
         def colorize(self, formats, loglevel):
                 if loglevel == logging.MINI:
-                        frmt = '{gray}' + formats[loglevel] + '{end}'
+                        return '{gray}' + formats[loglevel] + '{end}'
                 elif loglevel == logging.CRITICAL:
-                        frmt = '{magenta}{bold}' + formats[loglevel] + '{end}'
+                        return '{magenta}{bold}' + formats[loglevel] + '{end}'
                 elif loglevel == logging.ERROR:
-                        frmt = '{red}{bold}' + formats[loglevel] + '{end}'
+                        return '{red}{bold}' + formats[loglevel] + '{end}'
                 elif loglevel == logging.WARNING:
-                        frmt = '{yellow}{bold}' + formats[loglevel] + '{end}'
+                        return '{yellow}{bold}' + formats[loglevel] + '{end}'
                 elif loglevel == logging.INFO:
-                        frmt = '{cyan}' + formats[loglevel] + '{end}'
+                        return '{cyan}' + formats[loglevel] + '{end}'
                 elif loglevel == logging.DEBUG:
-                        frmt = '{green}' + formats[loglevel] + '{end}'
+                        return '{green}' + formats[loglevel] + '{end}'
                 else:
-                        frmt = '{end}' + formats[loglevel] + '{end}'
-                return frmt
+                        return '{end}' + formats[loglevel] + '{end}'
 
         def format(self, record):
                 formatter = self.formatters.get(record.levelno, self.default_fmt)
@@ -194,10 +193,7 @@ def logger_create(log_obj, config, mode = 'a'):
         def apply_formatter(levelnum, formats, handler, color = False):
                 levelformdict = {}
                 for num in levelnum:
-                        if num != logging.CRITICAL + 10:
-                                levelformdict[num] = formats[0]
-                        else:
-                                levelformdict[num] = formats[1]
+                        levelformdict[num] = formats[0] if num != logging.CRITICAL + 10 else formats[1]
                 handler.setFormatter(LevelFormatter(levelformdict, color = color))
                 return handler
 
@@ -284,23 +280,23 @@ ValidLcid = [1025, 1026, 1027, 1028, 1029,
 
 # http://stackoverflow.com/questions/3425294/how-to-detect-the-os-default-language-in-python
 def check_lcid(lcid, log_obj):
-        if not lcid or (lcid not in ValidLcid):
-                if hasattr(sys, 'implementation') and sys.implementation.name == 'cpython':
+        if lcid and lcid in ValidLcid:
+                return lcid
+        if hasattr(sys, 'implementation') and sys.implementation.name == 'cpython':
+                fixlcid = 1033
+        elif os.name == 'nt':
+                import ctypes
+
+                fixlcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        else:
+                import locale
+
+                try:
+                        fixlcid = next(k for k, v in locale.windows_locale.items() if v == locale.getdefaultlocale()[0])
+                except StopIteration:
                         fixlcid = 1033
-                elif os.name == 'nt':
-                        import ctypes
-
-                        fixlcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
-                else:
-                        import locale
-
-                        try:
-                                fixlcid = next(k for k, v in locale.windows_locale.items() if v == locale.getdefaultlocale()[0])
-                        except StopIteration:
-                                fixlcid = 1033
-                pretty_printer(log_obj = log_obj, put_text = "{reverse}{yellow}{bold}LCID '%s' auto-fixed with LCID '%s'{end}" %(lcid, fixlcid))
-                return fixlcid
-        return lcid
+        pretty_printer(log_obj = log_obj, put_text = "{reverse}{yellow}{bold}LCID '%s' auto-fixed with LCID '%s'{end}" %(lcid, fixlcid))
+        return fixlcid
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -372,7 +368,9 @@ def kms_parser_check_optionals(userarg, zeroarg, onearg, msg = 'optional py-kms 
                         if len(opt) > 2 and opt[2] == arg_to_check[2]:
                                 for indx in range(-1, -len(opt), -1):
                                         if opt[:indx] == arg_to_check:
-                                                raise KmsParserException("%s argument `%s` abbreviation not allowed for `%s`" %(msg, arg_to_check, opt))
+                                                raise KmsParserException(
+                                                    f"{msg} argument `{arg_to_check}` abbreviation not allowed for `{opt}`"
+                                                )
                 return False
 
         # Check abbreviations, joining, not existing.
@@ -380,13 +378,14 @@ def kms_parser_check_optionals(userarg, zeroarg, onearg, msg = 'optional py-kms 
                 if arg not in allarg:
                         if arg.startswith('-'):
                                 if arg == '--' or arg[:2] != '--' or not is_abbrev(allarg, arg):
-                                        raise KmsParserException("unrecognized %s arguments: `%s`" %(msg, arg))
+                                        raise KmsParserException(f"unrecognized {msg} arguments: `{arg}`")
 
         # Check duplicates.
         founds = [i for i in userarg if i in allarg]
         dup = [item for item in set(founds) if founds.count(item) > 1]
         if dup != []:
-                raise KmsParserException("%s argument `%s` appears several times" %(msg, ', '.join(dup)))
+                raise KmsParserException(
+                    f"{msg} argument `{', '.join(dup)}` appears several times")
 
         # Check length.
         elem = None
@@ -404,7 +403,9 @@ def kms_parser_check_optionals(userarg, zeroarg, onearg, msg = 'optional py-kms 
                                 pass
 
                         if elem and elem not in allarg:
-                                raise KmsParserException("%s argument `" %msg + found + "`:" + " expected " + num + " unrecognized: '%s'" %elem)
+                                raise KmsParserException(
+                                    f"{msg} argument `{found}`: expected {num}"
+                                    + f" unrecognized: '{elem}'")
 
 def kms_parser_check_positionals(config, parse_method, arguments = [], force_parse = False, msg = 'positional py-kms server'):
         try:
@@ -417,7 +418,7 @@ def kms_parser_check_positionals(config, parse_method, arguments = [], force_par
                 if e.startswith('argument'):
                         raise
                 else:
-                        raise KmsParserException("unrecognized %s arguments: '%s'" %(msg, e.split(': ')[1]))
+                        raise KmsParserException(f"unrecognized {msg} arguments: '{e.split(': ')[1]}'")
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------
 def proper_none(dictionary):
@@ -447,14 +448,14 @@ def check_setup(config, options, logger, where):
 
         # Setup hidden / asynchronous messages.
         hidden = ['STDOUT', 'FILESTDOUT', 'STDOUTOFF']
-        view_flag = (False if any(opt in hidden for opt in config['logfile']) else True)
-        if where == 'srv':
-                ShellMessage.viewsrv = view_flag
-                ShellMessage.asyncmsgsrv = config['asyncmsg']
-        elif where == 'clt':
+        view_flag = all(opt not in hidden for opt in config['logfile'])
+        if where == 'clt':
                 ShellMessage.viewclt = view_flag
                 ShellMessage.asyncmsgclt = config['asyncmsg']
 
+        elif where == 'srv':
+                ShellMessage.viewsrv = view_flag
+                ShellMessage.asyncmsgsrv = config['asyncmsg']
         # Create log.
         logger_create(logger, config, mode = 'a')
 

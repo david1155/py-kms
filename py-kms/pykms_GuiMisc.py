@@ -106,9 +106,8 @@ class ToolTip(object):
                 self.tw.wm_geometry("+%d+%d" % (x, y))
                 
         def hide(self):
-                tw = self.tw
-                if tw:
-                    tw.destroy()
+                if tw := self.tw:
+                        tw.destroy()
                 self.tw = None
 
 ##-----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -165,10 +164,7 @@ class TextRedirect(object):
                         widget.tag_add(tag, "insert linestart", "insert lineend")
 
                 def textbox_newline(self, message):
-                        if not message.endswith('\n'):
-                                return message + '\n'
-                        else:
-                                return message
+                        return message + '\n' if not message.endswith('\n') else message
 
                 def textbox_format(self, message):
                         # vertical align.
@@ -294,12 +290,14 @@ def custom_background(window):
                         widgets_alphahigh.append(window.pagewidgets[side]["AniWin"][position])
                 for pagename in window.pagewidgets[side]["PageWin"].keys():
                         widgets_alphalow.append(window.pagewidgets[side]["PageWin"][pagename])
-        
+
         try:
                 from PIL import Image, ImageTk
 
                 # Open Image.
-                img = Image.open(os.path.dirname(os.path.abspath( __file__ )) + "/graphics/pykms_Keys.gif")
+                img = Image.open(
+                    f"{os.path.dirname(os.path.abspath(__file__))}/graphics/pykms_Keys.gif"
+                )
                 img = img.convert('RGBA')
                 # Resize image.
                 img.resize((window.winfo_width(), window.winfo_height()), Image.ANTIALIAS)
@@ -318,12 +316,12 @@ def custom_background(window):
 
                 cutter(window, img, widgets_alphalow, window.backcrops_alphalow, 36)
                 cutter(window, img, widgets_alphahigh, window.backcrops_alphahigh, 96)
-                        
+
                 # Put semi-transparent background overall.
                 img.putalpha(128)
                 window.backimg = ImageTk.PhotoImage(img)
                 window.masterwin.create_image(1, 1, image = window.backimg, anchor = 'nw')
-                
+
         except ImportError:
                 for widget in widgets_alphalow + widgets_alphahigh:
                         widget.configure(background = window.customcolors['lavender'])
@@ -401,7 +399,7 @@ class Animation(object):
 def custom_pages(window, side):
         buttons = window.pagewidgets[side]["BtnAni"]
         labels = window.pagewidgets[side]["LblAni"]
-        
+
         for position in buttons.keys():
                 buttons[position].config(anchor = "center",
                                          font = window.btnwinfont,
@@ -410,10 +408,18 @@ def custom_pages(window, side):
                                          borderwidth = 2)
 
                 try:
-                        anibtn = Animation(os.path.dirname(os.path.abspath( __file__ )) + "/graphics/pykms_Keyhole_%s.gif" %position,
-                                           window, buttons[position], loop = False)
-                        anilbl = Animation(os.path.dirname(os.path.abspath( __file__ )) + "/graphics/pykms_Arrow_%s.gif" %position,
-                                           window, labels[position], loop = True)
+                        anibtn = Animation(
+                            f"{os.path.dirname(os.path.abspath(__file__))}/graphics/pykms_Keyhole_{position}.gif",
+                            window,
+                            buttons[position],
+                            loop=False,
+                        )
+                        anilbl = Animation(
+                            f"{os.path.dirname(os.path.abspath(__file__))}/graphics/pykms_Arrow_{position}.gif",
+                            window,
+                            labels[position],
+                            loop=True,
+                        )
 
                         def animationwait(master, button, btn_animation, lbl_animation):
                                 while btn_animation.cancelid:

@@ -715,7 +715,7 @@ class MSRPCBindAck(MSRPCHeader):
         Structure.fromString(self,data)
         # Parse the ctx_items
         data = self['ctx_items']
-        for i in range(self['ctx_num']):
+        for _ in range(self['ctx_num']):
             item = CtxItemResult(data)
             self.__ctx_items.append(item)
             data = data[len(item):]

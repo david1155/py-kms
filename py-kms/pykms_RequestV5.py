@@ -69,16 +69,14 @@ class kmsRequestV5(kmsBase):
 
         def executeRequestLogic(self):
                 requestData = self.RequestV5(self.data)
-        
+
                 decrypted = self.decryptRequest(requestData)
 
                 responseBuffer = self.serverLogic(decrypted['request'])
-        
+
                 iv, encrypted = self.encryptResponse(requestData, decrypted, responseBuffer)
 
-                responseData = self.generateResponse(iv, encrypted, requestData)
-
-                return responseData
+                return self.generateResponse(iv, encrypted, requestData)
         
         def decryptRequest(self, request):
                 encrypted = bytearray(enco(str(request['message']), 'latin-1'))
@@ -127,7 +125,7 @@ class kmsRequestV5(kmsBase):
                 return self.DecryptedResponse(decrypted)
                 
         def getRandomSalt(self):
-                return bytearray(random.getrandbits(8) for i in range(16))
+                return bytearray(random.getrandbits(8) for _ in range(16))
         
         def generateResponse(self, iv, encryptedResponse, requestData):
                 response = self.ResponseV5()
